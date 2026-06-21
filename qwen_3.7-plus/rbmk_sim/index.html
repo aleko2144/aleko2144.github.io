@@ -1,0 +1,1578 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>РБМК-1000 ИМИТАТОР v1.6</title>
+<link href="https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    background: #000;
+    color: #33ff33;
+    font-family: 'Share Tech Mono', 'VT323', 'Consolas', 'Courier New', monospace;
+    font-size: 15px;
+    overflow: hidden;
+    letter-spacing: 0.5px;
+  }
+  
+  body {
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    background:
+      radial-gradient(ellipse at center, #001a00 0%, #000 100%);
+    position: relative;
+  }
+  
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    border-radius: 20px / 30px;
+    box-shadow:
+      inset 0 0 80px rgba(0,0,0,0.6),
+      inset 0 0 30px rgba(0,0,0,0.4);
+    pointer-events: none;
+    z-index: 9997;
+  }
+  
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background:
+      repeating-linear-gradient(
+        0deg,
+        rgba(0,0,0,0.15) 0px,
+        rgba(0,0,0,0.15) 1px,
+        transparent 1px,
+        transparent 3px
+      );
+    pointer-events: none;
+    z-index: 9998;
+    animation: scanmove 8s linear infinite;
+  }
+  
+  @keyframes scanmove {
+    0% { background-position: 0 0; }
+    100% { background-position: 0 100px; }
+  }
+  
+  .crt-vignette {
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(
+      ellipse at center,
+      transparent 50%,
+      rgba(0,0,0,0.3) 80%,
+      rgba(0,0,0,0.6) 100%
+    );
+    pointer-events: none;
+    z-index: 9996;
+  }
+  
+  .crt-flicker {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9995;
+    animation: flicker 0.15s infinite;
+    background: transparent;
+  }
+  @keyframes flicker {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.99; }
+    75% { opacity: 0.995; }
+  }
+  
+  .rgb-text {
+    text-shadow:
+      -1px 0 0 rgba(255,0,0,0.2),
+      1px 0 0 rgba(0,255,255,0.2),
+      0 0 3px currentColor;
+  }
+  .rgb-yellow {
+    color: #ffff33;
+    text-shadow:
+      -1px 0 0 rgba(255,0,0,0.25),
+      1px 0 0 rgba(0,255,0,0.25),
+      0 0 4px #ffff33;
+  }
+  .rgb-cyan {
+    color: #33ffff;
+    text-shadow:
+      -1px 0 0 rgba(255,0,255,0.25),
+      1px 0 0 rgba(0,255,0,0.25),
+      0 0 4px #33ffff;
+  }
+  
+  .panel {
+    border: 1px solid #33ff33;
+    padding: 6px 10px;
+    position: relative;
+    background: rgba(0,20,0,0.3);
+  }
+  .panel-title {
+    position: absolute;
+    top: -9px;
+    left: 10px;
+    background: #000;
+    padding: 0 6px;
+    color: #ffff33;
+    font-size: 13px;
+    letter-spacing: 1px;
+    z-index: 10;
+  }
+  .header {
+    display: flex;
+    justify-content: space-between;
+    border: 1px solid #33ff33;
+    padding: 6px 12px;
+    margin-bottom: 8px;
+    font-weight: bold;
+    background: rgba(0,20,0,0.3);
+  }
+  .header .title {
+    color: #ffff33;
+    font-size: 16px;
+    letter-spacing: 2px;
+  }
+  .header .clock { color: #33ffff; font-size: 15px; }
+  .main {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 280px 1fr 280px;
+    gap: 8px;
+    min-height: 0;
+  }
+  .col { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+  .log {
+    height: 160px;
+    border: 1px solid #33ff33;
+    padding: 6px;
+    overflow-y: auto;
+    font-size: 13px;
+    background: #000;
+  }
+  .log::-webkit-scrollbar { width: 8px; }
+  .log::-webkit-scrollbar-track { background: #001a00; }
+  .log::-webkit-scrollbar-thumb { background: #33ff33; }
+  .log-entry { margin-bottom: 2px; }
+  .log-entry.warn { color: #ffff33; }
+  .log-entry.err { color: #ff3333; text-shadow: 0 0 4px #ff3333; }
+  .log-entry.ok { color: #33ffff; }
+  
+  .rod-grid {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 2px;
+    margin-top: 4px;
+  }
+  .rod {
+    height: 80px;
+    background: #001a00;
+    border: 1px solid #33ff33;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .rod-fill {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #33ff33;
+    box-shadow: 0 0 4px #33ff33;
+    transition: height 0.3s;
+  }
+  .rod.hot .rod-fill { background: #ff3333; box-shadow: 0 0 4px #ff3333; }
+  .rod.selected {
+    border-color: #ffff33;
+    box-shadow: 0 0 4px #ffff33, inset 0 0 3px rgba(255,255,51,0.3);
+  }
+  
+  .gauge {
+    margin: 6px 0;
+  }
+  .gauge-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    margin-bottom: 2px;
+  }
+  .gauge-label .val { color: #ffff33; }
+  .gauge-bar {
+    height: 12px;
+    background: #001a00;
+    border: 1px solid #33ff33;
+    position: relative;
+    overflow: hidden;
+  }
+  .gauge-fill {
+    height: 100%;
+    background: #33ff33;
+    box-shadow: 0 0 4px #33ff33;
+    transition: width 0.2s, background 0.2s;
+  }
+  .gauge-fill.warn { background: #ffff33; box-shadow: 0 0 4px #ffff33; }
+  .gauge-fill.crit { background: #ff3333; box-shadow: 0 0 4px #ff3333; animation: blink 0.5s infinite; }
+  @keyframes blink { 50% { opacity: 0.4; } }
+  
+  .core-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 64px 0;
+    position: relative;
+  }
+  .core-wrap {
+    position: relative;
+    width: min(100%, 220px);
+    aspect-ratio: 1;
+  }
+  .core {
+    display: grid;
+    grid-template-columns: repeat(13, 1fr);
+    gap: 1px;
+    width: 100%;
+    height: 100%;
+    clip-path: circle(50% at 50% 50%);
+    border-radius: 50%;
+    background: #001a00;
+    padding: 2px;
+  }
+  .cell {
+    background: #001a00;
+    border: 1px solid #003300;
+    font-size: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #33ff33;
+    aspect-ratio: 1;
+  }
+  .cell.c1 { background: #003300; }
+  .cell.c2 { background: #336600; color: #ffff33; }
+  .cell.c3 { background: #996600; color: #ffff33; }
+  .cell.c4 { background: #cc3300; color: #ff3333; animation: blink 0.3s infinite; }
+  .cell.empty { background: #000; border-color: #000; }
+  
+  .rod-indicators {
+    position: absolute;
+    inset: -22px;
+    pointer-events: none;
+  }
+  .rod-ind {
+    transform-origin: center;
+  }
+  .rod-ind-bg {
+    fill: #001a00;
+    stroke: #33ff33;
+    stroke-width: 1;
+    transition: stroke 0.2s, stroke-width 0.2s;
+  }
+  .rod-ind-needle {
+    stroke: #33ff33;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    transition: transform 0.3s, stroke 0.2s;
+  }
+  .rod-ind.selected .rod-ind-bg {
+    stroke: #ffff33;
+    stroke-width: 1.5;
+    filter: drop-shadow(0 0 2px #ffff33);
+  }
+  .rod-ind.selected .rod-ind-needle {
+    stroke: #ffff33;
+  }
+  .rod-ind.selected .rod-ind-text {
+    fill: #ffff33;
+  }
+  
+  .controls {
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  .controls kbd {
+    background: #001a00;
+    border: 1px solid #33ff33;
+    padding: 1px 6px;
+    color: #ffff33;
+    min-width: 24px;
+    display: inline-block;
+    text-align: center;
+  }
+  
+  .subsys {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 4px;
+  }
+  .subsys-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 3px 6px;
+    border: 1px solid #003300;
+    font-size: 13px;
+  }
+  .subsys-row .status-on { color: #33ff33; text-shadow: 0 0 3px #33ff33; }
+  .subsys-row .status-off { color: #666; }
+  .subsys-row .status-err { color: #ff3333; animation: blink 0.5s infinite; }
+  
+  .status-bar {
+    border: 1px solid #33ff33;
+    padding: 6px 12px;
+    margin-top: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    gap: 10px;
+    background: rgba(0,20,0,0.3);
+  }
+  .status-bar .reactor-ok { color: #33ff33; }
+  .status-bar .reactor-warn { color: #ffff33; }
+  .status-bar .reactor-crit { color: #ff3333; animation: blink 0.5s infinite; }
+  
+  .btn {
+    background: #000;
+    color: #33ff33;
+    border: 1px solid #33ff33;
+    padding: 4px 12px;
+    font-family: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: all 0.1s;
+  }
+  .btn:hover {
+    background: #003300;
+    box-shadow: 0 0 6px #33ff33;
+  }
+  .btn:active {
+    background: #33ff33;
+    color: #000;
+  }
+  .btn.btn-warn {
+    color: #ffff33;
+    border-color: #ffff33;
+  }
+  .btn.btn-warn:hover {
+    background: #333300;
+    box-shadow: 0 0 6px #ffff33;
+  }
+  .btn.btn-danger {
+    color: #ff3333;
+    border-color: #ff3333;
+    animation: pulse-red 2s infinite;
+  }
+  .btn.btn-danger:hover {
+    background: #330000;
+    box-shadow: 0 0 8px #ff3333;
+  }
+  .btn.btn-info {
+    color: #33ffff;
+    border-color: #33ffff;
+  }
+  .btn.btn-info:hover {
+    background: #003333;
+    box-shadow: 0 0 6px #33ffff;
+  }
+  @keyframes pulse-red {
+    0%, 100% { box-shadow: 0 0 2px #ff3333; }
+    50% { box-shadow: 0 0 8px #ff3333; }
+  }
+  
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.92);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    z-index: 100;
+    color: #ff3333;
+    text-align: center;
+  }
+  .overlay.show { display: flex; }
+  .overlay h1 { font-size: 52px; margin-bottom: 20px; animation: blink 0.8s infinite; letter-spacing: 4px; }
+  .overlay p { font-size: 17px; margin: 4px 0; color: #ffff33; }
+  .overlay .ov-buttons {
+    margin-top: 24px;
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .overlay button {
+    background: #000;
+    color: #33ff33;
+    border: 2px solid #33ff33;
+    padding: 10px 30px;
+    font-family: inherit;
+    font-size: 17px;
+    cursor: pointer;
+    letter-spacing: 2px;
+  }
+  .overlay button:hover { background: #003300; }
+  .overlay button.btn-continue {
+    color: #33ffff;
+    border-color: #33ffff;
+  }
+  .overlay button.btn-continue:hover { background: #003333; }
+  .overlay button.hidden { display: none; }
+  
+  .big-num {
+    font-size: 30px;
+    color: #ffff33;
+    font-weight: bold;
+    text-align: center;
+    padding: 4px;
+    border: 1px dashed #33ff33;
+    margin: 4px 0;
+    letter-spacing: 3px;
+  }
+  
+  .az5-btn {
+    background: #330000 !important;
+    color: #ff3333 !important;
+    border: 2px solid #ff3333 !important;
+    padding: 8px;
+    text-align: center;
+    cursor: pointer;
+    font-weight: bold;
+    margin-top: 8px;
+    letter-spacing: 2px;
+    font-size: 14px;
+  }
+  .az5-btn:hover { background: #660000 !important; }
+  .az5-btn.active { animation: blink 0.3s infinite; }
+  
+  .chart-panel {
+    border: 1px solid #33ff33;
+    padding: 6px;
+    background: rgba(0,20,0,0.3);
+    position: relative;
+  }
+  .chart-panel .panel-title {
+    position: absolute;
+    top: -9px;
+    left: 10px;
+    background: #000;
+    padding: 0 6px;
+    color: #ffff33;
+    font-size: 13px;
+    z-index: 2;
+  }
+  #chart {
+    width: 100%;
+    height: 130px;
+    display: block;
+    background: #000;
+    border: 1px solid #003300;
+    image-rendering: pixelated;
+  }
+  .chart-legend {
+    display: flex;
+    justify-content: space-around;
+    font-size: 11px;
+    margin-top: 4px;
+    padding: 2px;
+  }
+  .chart-legend span { display: flex; align-items: center; gap: 4px; }
+  .chart-legend .dot {
+    width: 10px;
+    height: 10px;
+    display: inline-block;
+  }
+  
+  .margin-warn {
+    color: #ffff33 !important;
+    text-shadow: 0 0 3px #ffff33;
+  }
+  .margin-crit {
+    color: #ff3333 !important;
+    text-shadow: 0 0 4px #ff3333;
+    animation: blink 0.5s infinite;
+  }
+  
+  .help-dialog {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 101;
+  }
+  .help-dialog.show { display: flex; }
+  .help-box {
+    background: #000;
+    border: 2px solid #33ff33;
+    padding: 20px 30px;
+    max-width: 650px;
+    max-height: 85vh;
+    overflow-y: auto;
+    font-size: 14px;
+    line-height: 1.6;
+    box-shadow: 0 0 30px #33ff33;
+  }
+  .help-box::-webkit-scrollbar { width: 8px; }
+  .help-box::-webkit-scrollbar-track { background: #001a00; }
+  .help-box::-webkit-scrollbar-thumb { background: #33ff33; }
+  .help-box h2 {
+    color: #ffff33;
+    margin-bottom: 12px;
+    text-align: center;
+    letter-spacing: 3px;
+  }
+  .help-box h3 {
+    color: #33ffff;
+    margin: 10px 0 6px 0;
+    letter-spacing: 1px;
+  }
+  .help-box kbd {
+    background: #001a00;
+    border: 1px solid #33ff33;
+    padding: 1px 6px;
+    color: #ffff33;
+    min-width: 20px;
+    display: inline-block;
+    text-align: center;
+  }
+  .help-box .close-hint {
+    text-align: center;
+    margin-top: 16px;
+    color: #33ffff;
+  }
+  .help-box .equip-desc {
+    padding-left: 12px;
+    margin: 4px 0;
+    color: #33ff33;
+    font-size: 13px;
+  }
+  .help-box .equip-desc b {
+    color: #ffff33;
+  }
+  .help-box .warn-box {
+    border: 1px solid #ff3333;
+    padding: 8px 12px;
+    margin: 8px 0;
+    color: #ff3333;
+    background: rgba(51,0,0,0.3);
+  }
+</style>
+</head>
+<body>
+
+<div class="crt-vignette"></div>
+<div class="crt-flicker"></div>
+
+<div class="header">
+  <span class="title rgb-yellow">▓ РЕАКТОР БОЛЬШОЙ МОЩНОСТИ КАНАЛЬНЫЙ ▓ ИМИТАТОР v1.6 ▓</span>
+  <span class="clock rgb-cyan" id="clock">--:--:-- --.--.----</span>
+</div>
+
+<div class="main">
+  
+  <div class="col">
+    <div class="panel" style="flex: 0 0 auto;">
+      <span class="panel-title rgb-yellow">СТЕРЖНИ СУ (ОР СУ)</span>
+      <div style="font-size:12px; margin-top:4px;">
+        Положение: <span id="rod-pos" class="rgb-yellow">50.0%</span>
+        <span style="float:right">Группа: <span id="rod-grp" class="rgb-cyan">ALL</span></span>
+      </div>
+      <div class="rod-grid" id="rod-grid"></div>
+      <div style="font-size:10px; margin-top:4px; color:#33ffff;">
+        ▼ ВВЕДЕНЫ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ИЗВЛЕЧЕНЫ ▲
+      </div>
+    </div>
+    
+    <div class="panel" style="flex: 1 0 auto;">
+      <span class="panel-title rgb-yellow">ПОДСИСТЕМЫ</span>
+      <div class="subsys" id="subsys">
+        <div class="subsys-row"><span>ГЦН-1 (контур 1)</span><span class="status-on" id="s-gcn1">[ВКЛ]</span></div>
+        <div class="subsys-row"><span>ГЦН-2 (контур 1)</span><span class="status-on" id="s-gcn2">[ВКЛ]</span></div>
+        <div class="subsys-row"><span>ГЦН-3 (контур 1)</span><span class="status-on" id="s-gcn3">[ВКЛ]</span></div>
+        <div class="subsys-row"><span>ГЦН-4 (контур 2)</span><span class="status-off" id="s-gcn4">[ВЫКЛ]</span></div>
+        <div class="subsys-row"><span>САОР (авар. охл.)</span><span class="status-off" id="s-saor">[ВЫКЛ]</span></div>
+        <div class="subsys-row"><span>АЗОТ (сдувка)</span><span class="status-off" id="s-n2">[ВЫКЛ]</span></div>
+        <div class="subsys-row"><span>КОНДЕНСАТОР</span><span class="status-on" id="s-cond">[ВКЛ]</span></div>
+        <div class="subsys-row"><span>ТУРБОГЕНЕРАТОР</span><span class="status-on" id="s-turb">[ВКЛ]</span></div>
+      </div>
+    </div>
+    
+    <div class="panel" style="flex: 0 0 auto;">
+      <span class="panel-title rgb-yellow">УПРАВЛЕНИЕ</span>
+      <div class="controls">
+        <kbd>↑</kbd><kbd>↓</kbd> стержни (зажать)<br>
+        <kbd>1</kbd>-<kbd>4</kbd> группы СУ<br>
+        <kbd>0</kbd> все группы<br>
+        <kbd>+</kbd><kbd>-</kbd> расход ГЦН<br>
+        <kbd>G</kbd> ГЦН-4 вкл/выкл<br>
+        <kbd>A</kbd> САОР вкл/выкл<br>
+        <kbd>N</kbd> азот вкл/выкл<br>
+        <kbd>C</kbd> конденсатор<br>
+        <kbd>T</kbd> турбина вкл/выкл<br>
+        <kbd>SPACE</kbd> АЗ-5 !!!<br>
+      </div>
+      <div class="az5-btn" id="az5-btn">▓ АЗ-5 ▓</div>
+    </div>
+  </div>
+  
+  <div class="col">
+    <div class="panel" style="flex: 0 0 auto;">
+      <span class="panel-title rgb-yellow">ТЕЛЕМЕТРИЯ РЕАКТОРА</span>
+      <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px;">
+        <div>
+          <div class="big-num rgb-yellow rgb-text" id="d-power">0000</div>
+          <div style="text-align:center; font-size:11px;">МОЩНОСТЬ МВт</div>
+        </div>
+        <div>
+          <div class="big-num rgb-yellow rgb-text" id="d-temp">000</div>
+          <div style="text-align:center; font-size:11px;">ТЕМПЕРАТУРА °C</div>
+        </div>
+        <div>
+          <div class="big-num rgb-yellow rgb-text" id="d-press">00</div>
+          <div style="text-align:center; font-size:11px;">ДАВЛЕНИЕ атм</div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="panel" style="flex: 0 0 auto;">
+      <span class="panel-title rgb-yellow">ПАРАМЕТРЫ</span>
+      <div class="gauge">
+        <div class="gauge-label"><span>МОЩНОСТЬ (ном. 3200 МВт)</span><span class="val" id="v-pow">0%</span></div>
+        <div class="gauge-bar"><div class="gauge-fill" id="b-pow" style="width:0%"></div></div>
+      </div>
+      <div class="gauge">
+        <div class="gauge-label"><span>ТЕМПЕРАТУРА ТВС (макс. 500°C)</span><span class="val" id="v-tmp">20°C</span></div>
+        <div class="gauge-bar"><div class="gauge-fill" id="b-tmp" style="width:0%"></div></div>
+      </div>
+      <div class="gauge">
+        <div class="gauge-label"><span>ДАВЛЕНИЕ КМПЦ (ном. 70 атм)</span><span class="val" id="v-prs">1 атм</span></div>
+        <div class="gauge-bar"><div class="gauge-fill" id="b-prs" style="width:0%"></div></div>
+      </div>
+      <div class="gauge">
+        <div class="gauge-label"><span>РАСХОД ТЕПЛОНОСИТЕЛЯ</span><span class="val" id="v-flw">100%</span></div>
+        <div class="gauge-bar"><div class="gauge-fill" id="b-flw" style="width:100%"></div></div>
+      </div>
+      <div class="gauge">
+        <div class="gauge-label"><span>РЕАКТИВНОСТЬ ρ (β=0.0065)</span><span class="val" id="v-rct">0.0000</span></div>
+        <div class="gauge-bar"><div class="gauge-fill" id="b-rct" style="width:50%"></div></div>
+      </div>
+      <div class="gauge">
+        <div class="gauge-label"><span>КСЕНОНОВОЕ ОТРАВЛЕНИЕ</span><span class="val" id="v-xen">0%</span></div>
+        <div class="gauge-bar"><div class="gauge-fill" id="b-xen" style="width:0%"></div></div>
+      </div>
+      <div class="gauge">
+        <div class="gauge-label"><span>ПАРОВОЕ ВОДЯНОЕ ЧИСЛО</span><span class="val" id="v-void">0%</span></div>
+        <div class="gauge-bar"><div class="gauge-fill" id="b-void" style="width:0%"></div></div>
+      </div>
+      <div class="gauge">
+        <div class="gauge-label"><span>ПОВРЕЖДЕНИЕ АКТИВНОЙ ЗОНЫ</span><span class="val" id="v-dmg">0%</span></div>
+        <div class="gauge-bar"><div class="gauge-fill" id="b-dmg" style="width:0%"></div></div>
+      </div>
+    </div>
+    
+    <div class="panel" style="flex: 1; min-height: 0; overflow: visible;">
+      <span class="panel-title rgb-yellow">АКТИВНАЯ ЗОНА (сечение)</span>
+      <div class="core-container">
+        <div class="core-wrap">
+          <div class="core" id="core"></div>
+          <svg class="rod-indicators" id="rod-indicators" viewBox="0 0 264 264"></svg>
+        </div>
+      </div>
+      <div style="font-size:10px; display:flex; justify-content:space-around; color:#33ffff;">
+        <span>■ холодно</span>
+        <span style="color:#996600">■ нагрето</span>
+        <span style="color:#ff3333">■ перегрев</span>
+        <span style="color:#ffff33">● выбранная группа</span>
+      </div>
+    </div>
+  </div>
+  
+  <div class="col">
+    <div class="panel" style="flex: 0 0 auto;">
+      <span class="panel-title rgb-yellow">ЗАДАНИЕ ОПЕРАТОРУ</span>
+      <div style="font-size:12px; line-height:1.5;">
+        <div>Цель: вывести реактор на <span class="rgb-yellow">1600 МВт</span></div>
+        <div>и удержать мощность 60 сек.</div>
+        <div style="margin-top:6px;">Удержание: <span id="hold-time" class="rgb-cyan">0</span> / 60 сек</div>
+        <div>Рейтинг: <span id="score" class="rgb-yellow">0</span></div>
+      </div>
+    </div>
+    
+    <div class="panel" style="flex: 0 0 auto;">
+      <span class="panel-title rgb-yellow">СОСТОЯНИЕ БЛОКА</span>
+      <div style="font-size:12px; line-height:1.6;">
+        <div>Статус: <span id="st-status" class="reactor-ok">НОРМА</span></div>
+        <div>Период разгона: <span id="st-period" class="rgb-cyan">∞</span> с</div>
+        <div>Выбег ГЦН: <span id="st-runout" class="rgb-cyan">0%</span></div>
+        <div>Запас реакт.: <span id="st-margin" class="rgb-cyan">30 стержней</span></div>
+        <div>Время работы: <span id="st-time" class="rgb-cyan">00:00</span></div>
+      </div>
+    </div>
+    
+    <div class="chart-panel">
+      <span class="panel-title">ГРАФИК ТЕЛЕМЕТРИИ</span>
+      <canvas id="chart" width="400" height="130"></canvas>
+      <div class="chart-legend">
+        <span><span class="dot" style="background:#33ff33;box-shadow:0 0 4px #33ff33"></span>МОЩНОСТЬ</span>
+        <span><span class="dot" style="background:#ffff33;box-shadow:0 0 4px #ffff33"></span>ТЕМПЕРАТУРА</span>
+        <span><span class="dot" style="background:#33ffff;box-shadow:0 0 4px #33ffff"></span>ДАВЛЕНИЕ</span>
+      </div>
+    </div>
+    
+    <div class="panel" style="flex: 1; min-height: 0; display:flex; flex-direction:column;">
+      <span class="panel-title rgb-yellow">ЖУРНАЛ СОБЫТИЙ</span>
+      <div class="log" id="log" style="flex:1; margin-top:4px;"></div>
+    </div>
+  </div>
+  
+</div>
+
+<div class="status-bar">
+  <span id="sb-left" class="reactor-ok">ГОТОВ К ПУСКУ</span>
+  <div style="display:flex; gap:6px;">
+    <button class="btn btn-info" id="btn-manual">📖 РУКОВОДСТВО</button>
+    <button class="btn" id="btn-help">СПРАВКА</button>
+    <button class="btn btn-warn" id="btn-reset">СБРОС</button>
+    <button class="btn btn-danger" id="btn-az5">АЗ-5</button>
+  </div>
+  <span id="sb-right" class="rgb-cyan">ОПЕРАТОР: АК-742</span>
+</div>
+
+<div class="overlay" id="overlay">
+  <h1 id="ov-title">АВАРИЯ</h1>
+  <p id="ov-msg">Сообщение</p>
+  <p id="ov-score">Рейтинг: 0</p>
+  <div class="ov-buttons">
+    <button class="btn-continue hidden" id="btn-continue" onclick="continueGame()">▶ ПРОДОЛЖИТЬ</button>
+    <button onclick="restart()">ПЕРЕЗАПУСК БЛОКА [R]</button>
+  </div>
+</div>
+
+<div class="help-dialog" id="help-dialog">
+  <div class="help-box">
+    <h2>▓ СПРАВОЧНОЕ РУКОВОДСТВО ▓</h2>
+    <div>
+      <p><b class="rgb-yellow">═══ УПРАВЛЕНИЕ ═══</b></p>
+      <p><kbd>↑</kbd> <kbd>↓</kbd> — извлечение/ввод стержней (зажать для плавного движения)</p>
+      <p><kbd>0</kbd>-<kbd>4</kbd> — выбор группы стержней (0=все, 1-4=группы)</p>
+      <p><kbd>+</kbd> <kbd>-</kbd> — увеличение/уменьшение расхода ГЦН</p>
+      <p><kbd>G</kbd> — ГЦН-4 (второй контур) вкл/выкл</p>
+      <p><kbd>A</kbd> — система аварийного охлаждения (САОР)</p>
+      <p><kbd>N</kbd> — азотная сдувка парового пространства</p>
+      <p><kbd>C</kbd> — конденсатор турбины вкл/выкл</p>
+      <p><kbd>T</kbd> — турбогенератор вкл/выкл</p>
+      <p><kbd>SPACE</kbd> — АЗ-5 (аварийная защита)</p>
+      <p><kbd>R</kbd> — перезапуск блока (после аварии)</p>
+      <p style="margin-top:10px;"><b class="rgb-yellow">═══ ГРУППЫ СТЕРЖНЕЙ ═══</b></p>
+      <p>▸ 24 стержня разделены на 4 группы по 6 штук</p>
+      <p>▸ Группы распределены РАВНОМЕРНО по активной зоне</p>
+      <p>▸ (группа 1 = стержни 0,4,8,12,16,20 и т.д.)</p>
+      <p>▸ Жёлтые индикаторы — выбранная группа</p>
+      <p>▸ Стрелки показывают глубину погружения</p>
+      <p style="margin-top:10px;"><b class="rgb-yellow">═══ ОСОБЕННОСТИ РБМК ═══</b></p>
+      <p>▸ Положительный паровой коэффициент</p>
+      <p>▸ Концевой эффект стержней АЗ-5</p>
+      <p>▸ Ксеноновое отравление после работы</p>
+      <p>▸ Низкая скорость ввода стержней (~18с)</p>
+    </div>
+    <div class="close-hint">[ Нажмите любую клавишу или кликните для закрытия ]</div>
+  </div>
+</div>
+
+<div class="help-dialog" id="manual-dialog">
+  <div class="help-box">
+    <h2>▓ РУКОВОДСТВО ОПЕРАТОРА ▓</h2>
+    
+    <h3>═══ НАЗНАЧЕНИЕ ОБОРУДОВАНИЯ ═══</h3>
+    
+    <div class="equip-desc">
+      <b>ГЦН-1, ГЦН-2, ГЦН-3 (1-й контур)</b><br>
+      Основные насосы, прокачивающие теплоноситель через активную зону. Всегда должны быть включены при работе реактора. Остановка любого из них резко снижает расход и может привести к перегреву.
+    </div>
+    
+    <div class="equip-desc">
+      <b>ГЦН-4 (2-й контур)</b><br>
+      Дополнительный насос, увеличивающий общий расход теплоносителя. Включается при мощности выше 1000 МВт для лучшего охлаждения и снижения паросодержания. ⚠ При отключении ГЦН-4 расход падает — следите за температурой!
+    </div>
+    
+    <div class="equip-desc">
+      <b>САОР (Система Аварийного Охлаждения Реактора)</b><br>
+      Аварийная система подачи теплоносителя при потере охлаждения. Включается автоматически при перегреве или вручную оператором. Резко снижает температуру, но создаёт гидравлические удары. Используйте только в аварийных ситуациях!
+    </div>
+    
+    <div class="equip-desc">
+      <b>АЗОТНАЯ СДУВКА</b><br>
+      Подаёт азот в паровое пространство барабанов-сепараторов для вытеснения парогазовой смеси. Предотвращает образование взрывоопасной смеси водорода и кислорода. Включается при работе на мощности выше 50%.
+    </div>
+    
+    <div class="equip-desc">
+      <b>КОНДЕНСАТОР ТУРБИНЫ</b><br>
+      Конденсирует отработанный пар из турбины обратно в воду, создавая разрежение на выходе турбины и повышая её КПД. Отключение конденсатора снижает эффективность турбины и повышает давление в контуре.
+    </div>
+    
+    <div class="equip-desc">
+      <b>ТУРБОГЕНЕРАТОР</b><br>
+      Преобразует тепловую энергию пара в электрическую. При отключении турбины пар сбрасывается в конденсатор или на свечу. Включение/отключение должно производиться плавно при стабильных параметрах.
+    </div>
+    
+    <div class="equip-desc">
+      <b>СТЕРЖНИ СУ (Системы Управления и Защиты)</b><br>
+      Поглощают нейтроны, регулируя реактивность. Извлечение стержней увеличивает мощность, ввод — снижает. Разделены на 4 группы, равномерно распределённые по активной зоне. Скорость движения: ~18 секунд на полный ход.
+    </div>
+    
+    <div class="equip-desc">
+      <b>АЗ-5 (Аварийная Защита 5-й категории)</b><br>
+      Полное аварийное заглушение реактора — все стержни вводятся в активную зону. ⚠ ВНИМАНИЕ: в первые секунды срабатывает "концевой эффект" — вытеснители стержней временно повышают реактивность! Не нажимайте при высокой мощности и извлечённых стержнях!
+    </div>
+    
+    <h3>═══ ЗАПАС РЕАКТИВНОСТИ (ОЗР) ═══</h3>
+    
+    <div class="equip-desc">
+      <b>Операторный Запас Реактивности (ОЗР)</b> — это количество стержней СУ, которые можно ввести в активную зону для компенсации внезапного роста реактивности. ОЗР отображается в окне "СОСТОЯНИЕ БЛОКА" и показывает, сколько стержней ещё доступно для управления реактором.
+    </div>
+    
+    <div class="equip-desc">
+      <b>Нормальные значения:</b> ОЗР более 15 стержней — реактор полностью управляем, запас достаточен для любых манёвров.
+    </div>
+    
+    <div class="equip-desc">
+      <b>Предупреждение (жёлтый, 8-14 стержней):</b> запас снижается, реактор становится менее устойчивым к возмущениям. Рекомендуется прекратить извлечение стержней и стабилизировать мощность.
+    </div>
+    
+    <div class="warn-box">
+      <b>⚠ КРИТИЧЕСКИЙ ОЗР (красный, менее 8 стержней):</b> реактор находится в опасной близости к потере управляемости! При ОЗР менее 6 стержней любая положительная реактивность (от пара, температуры, технологических возмущений) может привести к неуправляемому разгону. НЕМЕДЛЕННО введите часть стержней!
+    </div>
+    
+    <div class="equip-desc">
+      <b>Связь с другими параметрами:</b> при росте мощности увеличивается паросодержание → растёт положительная реактивность → требуется больше стержней для компенсации → ОЗР падает. Это основная причина, почему РБМК опасен на малой мощности с извлечёнными стержнями!
+    </div>
+    
+    <h3>═══ АЛГОРИТМ ПУСКА ═══</h3>
+    <div class="equip-desc">
+      1. Убедитесь, что все 3 ГЦН 1-го контура включены<br>
+      2. Плавно извлекайте стержни (↑), наблюдая за ростом мощности<br>
+      3. При мощности 500+ МВт включите азотную сдувку (N)<br>
+      4. При мощности 1000+ МВт включите ГЦН-4 (G) для увеличения расхода<br>
+      5. Выведите реактор на 1600 МВт и удерживайте 60 секунд<br>
+      6. При перегреве — включите САОР (A), но не допускайте резких скачков!<br>
+      7. <b>Следите за ОЗР!</b> Если запас падает ниже 10 — прекратите извлечение стержней
+    </div>
+    
+    <h3>═══ ПАРАМЕТРЫ И ШКАЛЫ ═══</h3>
+    <div class="equip-desc">
+      <b>Реактивность ρ</b> — баланс нейтронов. Положительная = рост мощности, отрицательная = падение. Держите близко к нулю для стабильной работы.<br><br>
+      <b>Пароводяное число</b> — доля пара в теплоносителе. При высоком значении положительный паровой коэффициент может вызвать неуправляемый разгон!<br><br>
+      <b>Ксеноновое отравление</b> — накопление Xe-133, поглощающего нейтроны. Растёт при работе на мощности, затрудняет повторный пуск после остановки.<br><br>
+      <b>Период разгона</b> — время, за которое мощность удвоится. При периоде менее 20 секунд реактор разгоняется слишком быстро для ручного управления!
+    </div>
+    
+    <div class="close-hint">[ Нажмите любую клавишу или кликните для закрытия ]</div>
+  </div>
+</div>
+
+<script>
+// ============ СОСТОЯНИЕ РЕАКТОРА ============
+const S = {
+  power: 0, temp: 20, pressure: 1, flow: 100,
+  rodPos: 50, rodGrp: 0, xenon: 0, void: 0, damage: 0,
+  reactivity: 0, period: Infinity,
+  gcn: [true, true, true, false],
+  saor: false, n2: false, cond: true, turb: true,
+  az5: false, az5_progress: 0,
+  holdTime: 0, score: 0, runTime: 0,
+  dead: false, won: false, exploded: false, scram: false,
+  lastLog: 0,
+  rodPositions: new Array(24).fill(50),
+  // Флаги для однократных предупреждений
+  warnedMarginLow: false,     // ОЗР < 12
+  warnedMarginCrit: false,    // ОЗР < 6
+  warnedTempHigh: false,      // temp > 400
+  warnedVoidHigh: false,      // void > 50
+  warnedXenonHigh: false,     // xenon > 70
+  warnedPowerOver: false,     // power > 3200
+};
+
+const history = { power: [], temp: [], pressure: [] };
+const MAX_POINTS = 120;
+
+const keysDown = {};
+
+function getRodGroup(i) {
+  return (i % 4) + 1;
+}
+
+function getRodsOfGroup(grp) {
+  const result = [];
+  for (let i = 0; i < 24; i++) {
+    if (getRodGroup(i) === grp) result.push(i);
+  }
+  return result;
+}
+
+// ============ ИНИЦИАЛИЗАЦИЯ UI ============
+const rodGrid = document.getElementById('rod-grid');
+const rods = [];
+for (let i = 0; i < 24; i++) {
+  const r = document.createElement('div');
+  r.className = 'rod';
+  r.innerHTML = '<div class="rod-fill" style="height:50%"></div>';
+  rodGrid.appendChild(r);
+  rods.push(r);
+}
+
+const core = document.getElementById('core');
+const cells = [];
+const CORE_SIZE = 13;
+const CORE_CENTER = 6;
+const CORE_RADIUS = 5.8;
+for (let i = 0; i < CORE_SIZE * CORE_SIZE; i++) {
+  const c = document.createElement('div');
+  const x = i % CORE_SIZE;
+  const y = Math.floor(i / CORE_SIZE);
+  const dist = Math.sqrt((x - CORE_CENTER) ** 2 + (y - CORE_CENTER) ** 2);
+  if (dist > CORE_RADIUS) {
+    c.className = 'cell empty';
+    c.textContent = '';
+  } else {
+    c.className = 'cell';
+    c.textContent = '·';
+  }
+  core.appendChild(c);
+  cells.push({ el: c, x, y, dist, active: dist <= CORE_RADIUS });
+}
+
+const rodIndicators = document.getElementById('rod-indicators');
+const rodIndElements = [];
+const IND_CENTER = 132;
+const IND_RADIUS = 120;
+for (let i = 0; i < 24; i++) {
+  const angle = (i / 24) * Math.PI * 2 - Math.PI / 2;
+  const x = IND_CENTER + Math.cos(angle) * IND_RADIUS;
+  const y = IND_CENTER + Math.sin(angle) * IND_RADIUS;
+  
+  const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  g.setAttribute('class', 'rod-ind');
+  g.setAttribute('transform', `translate(${x}, ${y})`);
+  
+  const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  circle.setAttribute('class', 'rod-ind-bg');
+  circle.setAttribute('r', '7');
+  g.appendChild(circle);
+  
+  const needle = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  needle.setAttribute('class', 'rod-ind-needle');
+  needle.setAttribute('x1', '0');
+  needle.setAttribute('y1', '0');
+  needle.setAttribute('x2', '0');
+  needle.setAttribute('y2', '-5');
+  g.appendChild(needle);
+  
+  const grp = getRodGroup(i);
+  const txt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  txt.setAttribute('class', 'rod-ind-text');
+  txt.setAttribute('x', '0');
+  txt.setAttribute('y', '2.5');
+  txt.setAttribute('text-anchor', 'middle');
+  txt.setAttribute('fill', '#33ff33');
+  txt.setAttribute('font-size', '5');
+  txt.setAttribute('font-family', 'Share Tech Mono, monospace');
+  txt.textContent = grp;
+  g.appendChild(txt);
+  
+  rodIndicators.appendChild(g);
+  rodIndElements.push({ g, needle, grp });
+}
+
+// ============ ЗВУК ============
+let audioCtx = null;
+function beep(freq = 440, dur = 0.05, type = 'square', vol = 0.05) {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    gain.gain.value = vol;
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(); osc.stop(audioCtx.currentTime + dur);
+  } catch(e) {}
+}
+function siren() {
+  beep(800, 0.2, 'sawtooth', 0.08);
+  setTimeout(() => beep(400, 0.2, 'sawtooth', 0.08), 200);
+}
+
+// ============ ЛОГ ============
+const logEl = document.getElementById('log');
+function log(msg, type = '') {
+  const t = new Date();
+  const ts = t.toTimeString().substr(0,8);
+  const e = document.createElement('div');
+  e.className = 'log-entry ' + type;
+  e.textContent = `[${ts}] ${msg}`;
+  logEl.appendChild(e);
+  logEl.scrollTop = logEl.scrollHeight;
+  while (logEl.children.length > 80) logEl.removeChild(logEl.firstChild);
+}
+
+// ============ ФИЗИКА ============
+function physicsTick(dt) {
+  if (S.dead || S.won) return;
+  S.runTime += dt;
+  
+  const rodSpeed = 5.5;
+  if (keysDown['arrowup']) {
+    if (S.rodGrp === 0) {
+      S.rodPos = Math.min(100, S.rodPos + rodSpeed * dt);
+      S.rodPositions = S.rodPositions.map(p => Math.min(100, p + rodSpeed * dt));
+    } else {
+      const rodsOfGrp = getRodsOfGroup(S.rodGrp);
+      for (const i of rodsOfGrp) {
+        S.rodPositions[i] = Math.min(100, S.rodPositions[i] + rodSpeed * dt);
+      }
+      S.rodPos = S.rodPositions.reduce((a, b) => a + b, 0) / 24;
+    }
+  }
+  if (keysDown['arrowdown']) {
+    if (S.rodGrp === 0) {
+      S.rodPos = Math.max(0, S.rodPos - rodSpeed * dt);
+      S.rodPositions = S.rodPositions.map(p => Math.max(0, p - rodSpeed * dt));
+    } else {
+      const rodsOfGrp = getRodsOfGroup(S.rodGrp);
+      for (const i of rodsOfGrp) {
+        S.rodPositions[i] = Math.max(0, S.rodPositions[i] - rodSpeed * dt);
+      }
+      S.rodPos = S.rodPositions.reduce((a, b) => a + b, 0) / 24;
+    }
+  }
+  
+  const rodReactivity = (S.rodPos - 50) * 0.0002;
+  const xenonReactivity = -S.xenon * 0.00008;
+  const voidReactivity = S.void * 0.0003;
+  const tempReactivity = -(S.temp - 270) * 0.000003;
+  
+  S.reactivity = rodReactivity + xenonReactivity + voidReactivity + tempReactivity;
+  
+  if (Math.abs(S.reactivity) < 0.00001) S.period = Infinity;
+  else S.period = 0.1 / S.reactivity;
+  
+  if (S.reactivity > 0 && S.power > 0.01) {
+    const growth = Math.exp(S.reactivity * dt * 20);
+    S.power *= Math.min(growth, 3);
+  } else if (S.reactivity < 0) {
+    S.power *= Math.exp(S.reactivity * dt * 15);
+  }
+  if (S.power < 0.1) S.power += 0.02 * dt;
+  S.power = Math.max(0, S.power);
+  
+  const xenonProd = S.power * 0.00002;
+  const xenonDecay = S.xenon * 0.005;
+  S.xenon = Math.max(0, Math.min(100, S.xenon + (xenonProd - xenonDecay) * dt));
+  
+  const voidProd = Math.max(0, (S.temp - 270) * 0.005 + S.power * 0.00001);
+  const voidRemoval = S.flow * 0.003;
+  S.void = Math.max(0, Math.min(100, S.void + (voidProd - voidRemoval) * dt));
+  
+  const activeGCN = S.gcn.filter(x => x).length;
+  const effectiveFlow = S.flow * (activeGCN / 4);
+  const heatGen = S.power * 0.02;
+  const heatRemoval = effectiveFlow * (S.temp - 20) * 0.0015;
+  const saorCool = S.saor ? 40 : 0;
+  S.temp += (heatGen - heatRemoval - saorCool) * dt;
+  S.temp = Math.max(20, S.temp);
+  
+  const targetPressure = S.temp > 100 ? Math.pow((S.temp - 80) / 50, 1.5) : 1;
+  S.pressure += (targetPressure - S.pressure) * dt * 0.3;
+  S.pressure = Math.max(1, S.pressure);
+  
+  if (S.temp > 500) S.damage += (S.temp - 500) * 0.03 * dt;
+  if (S.pressure > 150) S.damage += (S.pressure - 150) * 0.01 * dt;
+  if (S.power > 32000) S.damage += (S.power - 32000) * 0.0005 * dt;
+  if (S.power > 100000) S.damage += 30 * dt;
+  S.damage = Math.max(0, Math.min(100, S.damage));
+  
+  if (S.az5) {
+    S.az5_progress = Math.min(100, S.az5_progress + dt * 5.5);
+    if (S.az5_progress < 15 && S.rodPos > 70) {
+      const boost = dt * 2;
+      S.rodPos = Math.min(100, S.rodPos + boost);
+      S.rodPositions = S.rodPositions.map(p => Math.min(100, p + boost));
+    } else {
+      const drop = dt * 5.5;
+      S.rodPos = Math.max(0, S.rodPos - drop);
+      S.rodPositions = S.rodPositions.map(p => Math.max(0, p - drop));
+    }
+    if (S.az5_progress >= 100) {
+      S.az5 = false;
+      S.scram = true;
+      log('СТЕРЖНИ ПОЛНОСТЬЮ ВВЕДЕНЫ', 'ok');
+    }
+  }
+  
+  if (S.damage >= 100 && !S.dead) triggerExplosion('РАЗРУШЕНИЕ АКТИВНОЙ ЗОНЫ');
+  if (S.power > 100000 && !S.dead) triggerExplosion('ТЕПЛОВОЙ ВЗРЫВ РЕАКТОРА');
+  if (S.pressure > 250 && !S.dead) triggerExplosion('РАЗРЫВ КМПЦ');
+  
+  // Задание: удержание 1600 МВт
+  if (Math.abs(S.power - 1600) < 100 && S.power > 100) {
+    S.holdTime += dt;
+    S.score += dt * 10;
+  } else {
+    S.holdTime = Math.max(0, S.holdTime - dt * 0.5);
+  }
+  if (S.holdTime >= 60 && !S.won) winMission();
+  
+  // Однократные предупреждения в журнал
+  const margin = getMargin();
+  
+  // ОЗР критический (< 6)
+  if (margin < 6 && !S.warnedMarginCrit) {
+    log('▓▓ КРИТИЧЕСКИЙ ОЗР: ' + margin + ' стержней! ▓▓', 'err');
+    S.warnedMarginCrit = true;
+    S.warnedMarginLow = true; // не дублировать "низкий" после "критический"
+  } else if (margin >= 6) {
+    S.warnedMarginCrit = false;
+  }
+  
+  // ОЗР низкий (< 12)
+  if (margin < 12 && margin >= 6 && !S.warnedMarginLow) {
+    log('ВНИМАНИЕ: ОЗР снижен до ' + margin + ' стержней', 'warn');
+    S.warnedMarginLow = true;
+  } else if (margin >= 12) {
+    S.warnedMarginLow = false;
+  }
+  
+  // Высокая температура
+  if (S.temp > 400 && S.temp < 500 && !S.warnedTempHigh) {
+    log('ВНИМАНИЕ: высокая температура ТВС', 'warn');
+    S.warnedTempHigh = true;
+  } else if (S.temp <= 400 || S.temp >= 500) {
+    S.warnedTempHigh = false;
+  }
+  
+  // Высокое паросодержание
+  if (S.void > 50 && !S.warnedVoidHigh) {
+    log('ВНИМАНИЕ: высокое паросодержание', 'warn');
+    S.warnedVoidHigh = true;
+  } else if (S.void <= 50) {
+    S.warnedVoidHigh = false;
+  }
+  
+  // Ксеноновая яма
+  if (S.xenon > 70 && !S.warnedXenonHigh) {
+    log('Ксеноновая яма глубокая', 'warn');
+    S.warnedXenonHigh = true;
+  } else if (S.xenon <= 70) {
+    S.warnedXenonHigh = false;
+  }
+  
+  // Превышение мощности
+  if (S.power > 3200 && !S.warnedPowerOver) {
+    log('ПРЕВЫШЕНИЕ НОМИНАЛЬНОЙ МОЩНОСТИ', 'err');
+    S.warnedPowerOver = true;
+  } else if (S.power <= 3200) {
+    S.warnedPowerOver = false;
+  }
+  
+  if (!S._histTimer) S._histTimer = 0;
+  S._histTimer += dt;
+  if (S._histTimer > 0.25) {
+    S._histTimer = 0;
+    history.power.push(S.power);
+    history.temp.push(S.temp);
+    history.pressure.push(S.pressure);
+    if (history.power.length > MAX_POINTS) {
+      history.power.shift();
+      history.temp.shift();
+      history.pressure.shift();
+    }
+  }
+}
+
+function getMargin() {
+  return Math.max(0, Math.floor(30 - S.rodPos * 0.3));
+}
+
+function triggerExplosion(reason) {
+  S.dead = true;
+  S.exploded = true;
+  log('▓▓▓ АВАРИЯ: ' + reason + ' ▓▓▓', 'err');
+  siren();
+  setTimeout(siren, 500);
+  setTimeout(siren, 1000);
+  document.getElementById('ov-title').textContent = '☢ АВАРИЯ ☢';
+  document.getElementById('ov-title').style.color = '#ff3333';
+  document.getElementById('ov-title').style.textShadow = '0 0 10px #ff3333';
+  document.getElementById('ov-msg').textContent = reason;
+  document.getElementById('ov-score').textContent = 'Рейтинг: ' + Math.floor(S.score);
+  document.getElementById('btn-continue').classList.add('hidden');
+  document.getElementById('overlay').classList.add('show');
+  document.body.style.background = '#330000';
+}
+
+function winMission() {
+  S.won = true;
+  log('★★★ ЗАДАНИЕ ВЫПОЛНЕНО ★★★', 'ok');
+  beep(880, 0.3, 'sine', 0.1);
+  setTimeout(() => beep(1320, 0.5, 'sine', 0.1), 300);
+  document.getElementById('ov-title').textContent = '★ ЗАДАНИЕ ВЫПОЛНЕНО ★';
+  document.getElementById('ov-title').style.color = '#33ff33';
+  document.getElementById('ov-title').style.textShadow = '0 0 10px #33ff33';
+  document.getElementById('ov-msg').textContent = 'Реактор выведен на режим 1600 МВт';
+  document.getElementById('ov-score').textContent = 'Рейтинг: ' + Math.floor(S.score);
+  document.getElementById('btn-continue').classList.remove('hidden');
+  document.getElementById('overlay').classList.add('show');
+}
+
+function continueGame() {
+  S.won = false;
+  document.getElementById('overlay').classList.remove('show');
+  log('▶ Работа реактора возобновлена', 'ok');
+  log('Можете продолжать эксперименты с реактором', 'ok');
+  beep(600, 0.1, 'sine', 0.08);
+}
+
+// ============ ГРАФИК ============
+const chartCanvas = document.getElementById('chart');
+const chartCtx = chartCanvas.getContext('2d');
+
+function drawChart() {
+  const W = chartCanvas.width;
+  const H = chartCanvas.height;
+  const ctx = chartCtx;
+  
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, W, H);
+  
+  ctx.strokeStyle = '#003300';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 5; i++) {
+    const y = (H / 5) * i;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(W, y);
+    ctx.stroke();
+  }
+  for (let i = 0; i <= 10; i++) {
+    const x = (W / 10) * i;
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, H);
+    ctx.stroke();
+  }
+  
+  ctx.strokeStyle = '#33ff33';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
+  
+  function drawLine(data, color, maxVal) {
+    if (data.length < 2) return;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 4;
+    ctx.beginPath();
+    for (let i = 0; i < data.length; i++) {
+      const x = (i / (MAX_POINTS - 1)) * W;
+      const y = H - (Math.min(data[i], maxVal) / maxVal) * H;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+  
+  drawLine(history.power, '#33ff33', 5000);
+  drawLine(history.temp, '#ffff33', 600);
+  drawLine(history.pressure, '#33ffff', 200);
+}
+
+// ============ ОТРИСОВКА ============
+function render() {
+  rods.forEach((r, i) => {
+    const fill = r.querySelector('.rod-fill');
+    const pos = S.rodPositions[i];
+    fill.style.height = pos + '%';
+    r.classList.toggle('hot', S.temp > 400);
+    const isSelected = S.rodGrp === 0 || getRodGroup(i) === S.rodGrp;
+    r.classList.toggle('selected', isSelected);
+  });
+  document.getElementById('rod-pos').textContent = S.rodPos.toFixed(1) + '%';
+  document.getElementById('rod-grp').textContent = S.rodGrp === 0 ? 'ALL' : 'ГР.' + S.rodGrp;
+  
+  rodIndElements.forEach((ind, i) => {
+    const pos = S.rodPositions[i];
+    const angle = -135 + (pos / 100) * 270;
+    ind.needle.setAttribute('transform', `rotate(${angle})`);
+    const isSelected = S.rodGrp === 0 || ind.grp === S.rodGrp;
+    ind.g.setAttribute('class', 'rod-ind' + (isSelected ? ' selected' : ''));
+  });
+  
+  cells.forEach((cell) => {
+    if (!cell.active) return;
+    const dist = cell.dist;
+    const flux = Math.max(0, 1 - dist / CORE_RADIUS) * (S.power / 3200);
+    const heat = flux * (S.temp / 300);
+    const c = cell.el;
+    c.className = 'cell';
+    if (heat > 1.5) c.className = 'cell c4';
+    else if (heat > 0.8) c.className = 'cell c3';
+    else if (heat > 0.3) c.className = 'cell c2';
+    else if (heat > 0.05) c.className = 'cell c1';
+    c.textContent = heat > 0.05 ? '█' : '·';
+  });
+  
+  document.getElementById('d-power').textContent = String(Math.floor(S.power)).padStart(4, '0');
+  document.getElementById('d-temp').textContent = String(Math.floor(S.temp)).padStart(3, '0');
+  document.getElementById('d-press').textContent = String(Math.floor(S.pressure)).padStart(2, '0');
+  
+  setGauge('pow', S.power / 3200 * 100, S.power > 3200, S.power > 5000);
+  setGauge('tmp', S.temp / 600 * 100, S.temp > 400, S.temp > 500);
+  setGauge('prs', S.pressure / 200 * 100, S.pressure > 100, S.pressure > 150);
+  setGauge('flw', S.flow, false, false);
+  const rctPct = 50 + S.reactivity * 500;
+  setGauge('rct', Math.max(0, Math.min(100, rctPct)), rctPct > 70, rctPct > 85);
+  setGauge('xen', S.xenon, S.xenon > 50, S.xenon > 80);
+  setGauge('void', S.void, S.void > 40, S.void > 70);
+  setGauge('dmg', S.damage, S.damage > 20, S.damage > 50);
+  
+  document.getElementById('v-pow').textContent = (S.power/32).toFixed(1) + '%';
+  document.getElementById('v-tmp').textContent = S.temp.toFixed(0) + '°C';
+  document.getElementById('v-prs').textContent = S.pressure.toFixed(1) + ' атм';
+  document.getElementById('v-flw').textContent = S.flow.toFixed(0) + '%';
+  document.getElementById('v-rct').textContent = (S.reactivity >= 0 ? '+' : '') + S.reactivity.toFixed(4);
+  document.getElementById('v-xen').textContent = S.xenon.toFixed(1) + '%';
+  document.getElementById('v-void').textContent = S.void.toFixed(1) + '%';
+  document.getElementById('v-dmg').textContent = S.damage.toFixed(1) + '%';
+  
+  setSubsys('s-gcn1', S.gcn[0]);
+  setSubsys('s-gcn2', S.gcn[1]);
+  setSubsys('s-gcn3', S.gcn[2]);
+  setSubsys('s-gcn4', S.gcn[3]);
+  setSubsys('s-saor', S.saor);
+  setSubsys('s-n2', S.n2);
+  setSubsys('s-cond', S.cond);
+  setSubsys('s-turb', S.turb);
+  
+  const statusEl = document.getElementById('st-status');
+  if (S.dead) { statusEl.textContent = 'АВАРИЯ'; statusEl.className = 'reactor-crit'; }
+  else if (S.won) { statusEl.textContent = 'ЗАДАНИЕ ВЫПОЛНЕНО'; statusEl.className = 'reactor-ok'; }
+  else if (S.temp > 450 || S.power > 4000 || S.damage > 30) { statusEl.textContent = 'АВАРИЙНО'; statusEl.className = 'reactor-crit'; }
+  else if (S.temp > 350 || S.power > 3200 || S.void > 50) { statusEl.textContent = 'ВНИМАНИЕ'; statusEl.className = 'reactor-warn'; }
+  else { statusEl.textContent = 'НОРМА'; statusEl.className = 'reactor-ok'; }
+  
+  document.getElementById('st-period').textContent = isFinite(S.period) ? S.period.toFixed(1) : '∞';
+  document.getElementById('st-runout').textContent = (100 - S.flow).toFixed(0) + '%';
+  
+  const margin = getMargin();
+  const marginEl = document.getElementById('st-margin');
+  marginEl.textContent = margin + ' стержней';
+  marginEl.className = 'rgb-cyan';
+  if (margin < 6) {
+    marginEl.className = 'margin-crit';
+  } else if (margin < 12) {
+    marginEl.className = 'margin-warn';
+  }
+  
+  const mm = Math.floor(S.runTime / 60), ss = Math.floor(S.runTime % 60);
+  document.getElementById('st-time').textContent = String(mm).padStart(2,'0') + ':' + String(ss).padStart(2,'0');
+  
+  document.getElementById('hold-time').textContent = Math.floor(S.holdTime);
+  document.getElementById('score').textContent = Math.floor(S.score);
+  
+  const now = new Date();
+  document.getElementById('clock').textContent = 
+    now.toTimeString().substr(0,8) + '  21.06.2026';
+  
+  const sbLeft = document.getElementById('sb-left');
+  if (S.az5) { sbLeft.textContent = '▓▓ АЗ-5 СРАБАТЫВАЕТ ▓▓'; sbLeft.className = 'reactor-crit'; }
+  else if (S.dead) { sbLeft.textContent = 'БЛОК ОСТАНОВЛЕН'; sbLeft.className = 'reactor-crit'; }
+  else if (S.won) { sbLeft.textContent = '★ ЗАДАНИЕ ВЫПОЛНЕНО ★'; sbLeft.className = 'reactor-ok'; }
+  else if (margin < 6) { sbLeft.textContent = '⚠ КРИТИЧЕСКИЙ ОЗР'; sbLeft.className = 'reactor-crit'; }
+  else if (margin < 12) { sbLeft.textContent = '⚠ МАЛЫЙ ОЗР'; sbLeft.className = 'reactor-warn'; }
+  else if (S.temp > 400) { sbLeft.textContent = '⚠ ВЫСОКАЯ ТЕМПЕРАТУРА'; sbLeft.className = 'reactor-crit'; }
+  else if (S.power > 3200) { sbLeft.textContent = '⚠ ПРЕВЫШЕНИЕ МОЩНОСТИ'; sbLeft.className = 'reactor-warn'; }
+  else { sbLeft.textContent = 'РЕАКТОР В РАБОТЕ'; sbLeft.className = 'reactor-ok'; }
+  
+  document.getElementById('az5-btn').classList.toggle('active', S.az5);
+  
+  drawChart();
+}
+
+function setGauge(id, pct, warn, crit) {
+  const b = document.getElementById('b-' + id);
+  b.style.width = Math.max(0, Math.min(100, pct)) + '%';
+  b.className = 'gauge-fill' + (crit ? ' crit' : (warn ? ' warn' : ''));
+}
+
+function setSubsys(id, on) {
+  const el = document.getElementById(id);
+  if (on) { el.textContent = '[ВКЛ]'; el.className = 'status-on'; }
+  else { el.textContent = '[ВЫКЛ]'; el.className = 'status-off'; }
+}
+
+// ============ УПРАВЛЕНИЕ ============
+document.addEventListener('keydown', (e) => {
+  const helpDlg = document.getElementById('help-dialog');
+  const manualDlg = document.getElementById('manual-dialog');
+  if (helpDlg.classList.contains('show')) {
+    helpDlg.classList.remove('show');
+    return;
+  }
+  if (manualDlg.classList.contains('show')) {
+    manualDlg.classList.remove('show');
+    return;
+  }
+  
+  if ((S.dead || S.won) && e.key.toLowerCase() !== 'r') return;
+  const k = e.key.toLowerCase();
+  
+  keysDown[k] = true;
+  
+  if (k === 'arrowup' || k === 'arrowdown') {
+    e.preventDefault();
+    beep(k === 'arrowup' ? 600 : 400, 0.03);
+  } else if (k >= '1' && k <= '4') {
+    S.rodGrp = parseInt(k);
+    log('Выбрана группа СУ №' + k, 'ok');
+    beep(800, 0.05);
+  } else if (k === '0') {
+    S.rodGrp = 0;
+    log('Выбраны все группы СУ', 'ok');
+    beep(800, 0.05);
+  } else if (k === '+' || k === '=') {
+    S.flow = Math.min(100, S.flow + 10);
+    log('Расход ГЦН увеличен: ' + S.flow + '%', 'ok');
+    beep(500, 0.05);
+  } else if (k === '-') {
+    S.flow = Math.max(0, S.flow - 10);
+    log('Расход ГЦН уменьшен: ' + S.flow + '%', 'warn');
+    beep(300, 0.05);
+  } else if (k === 'g') {
+    S.gcn[3] = !S.gcn[3];
+    log('ГЦН-4 ' + (S.gcn[3] ? 'ВКЛЮЧЁН' : 'ОТКЛЮЧЁН'), S.gcn[3] ? 'ok' : 'warn');
+    beep(S.gcn[3] ? 800 : 200, 0.1);
+  } else if (k === 'a') {
+    S.saor = !S.saor;
+    log('САОР ' + (S.saor ? 'ВКЛЮЧЕНА' : 'ОТКЛЮЧЕНА'), S.saor ? 'ok' : 'warn');
+    beep(S.saor ? 1000 : 200, 0.1);
+  } else if (k === 'n') {
+    S.n2 = !S.n2;
+    log('Азотная сдувка ' + (S.n2 ? 'ВКЛ' : 'ВЫКЛ'), S.n2 ? 'ok' : 'warn');
+    beep(S.n2 ? 900 : 250, 0.1);
+  } else if (k === 'c') {
+    S.cond = !S.cond;
+    log('Конденсатор ' + (S.cond ? 'ВКЛ' : 'ВЫКЛ'), S.cond ? 'ok' : 'warn');
+    beep(S.cond ? 700 : 200, 0.1);
+  } else if (k === 't') {
+    S.turb = !S.turb;
+    log('Турбогенератор ' + (S.turb ? 'ВКЛ' : 'ВЫКЛ'), S.turb ? 'ok' : 'warn');
+  } else if (k === ' ') {
+    e.preventDefault();
+    triggerAZ5();
+  } else if (k === 'r') {
+    if (S.dead) restart();
+  }
+});
+
+document.addEventListener('keyup', (e) => {
+  const k = e.key.toLowerCase();
+  keysDown[k] = false;
+});
+
+function triggerAZ5() {
+  if (S.az5 || S.dead) return;
+  S.az5 = true;
+  S.az5_progress = 0;
+  log('▓▓▓ АЗ-5 НАЖАТА! АВАРИЙНАЯ ЗАЩИТА ▓▓▓', 'err');
+  siren();
+  beep(1500, 0.2, 'square', 0.1);
+}
+
+document.getElementById('az5-btn').addEventListener('click', triggerAZ5);
+document.getElementById('btn-az5').addEventListener('click', triggerAZ5);
+document.getElementById('btn-reset').addEventListener('click', restart);
+document.getElementById('btn-help').addEventListener('click', () => {
+  document.getElementById('help-dialog').classList.add('show');
+});
+document.getElementById('btn-manual').addEventListener('click', () => {
+  document.getElementById('manual-dialog').classList.add('show');
+});
+document.getElementById('help-dialog').addEventListener('click', (e) => {
+  if (e.target.id === 'help-dialog' || e.target.classList.contains('close-hint')) {
+    document.getElementById('help-dialog').classList.remove('show');
+  }
+});
+document.getElementById('manual-dialog').addEventListener('click', (e) => {
+  if (e.target.id === 'manual-dialog' || e.target.classList.contains('close-hint')) {
+    document.getElementById('manual-dialog').classList.remove('show');
+  }
+});
+
+function restart() {
+  Object.assign(S, {
+    power: 0, temp: 20, pressure: 1, flow: 100,
+    rodPos: 50, rodGrp: 0, xenon: 0, void: 0, damage: 0,
+    reactivity: 0, period: Infinity,
+    gcn: [true, true, true, false],
+    saor: false, n2: false, cond: true, turb: true,
+    az5: false, az5_progress: 0,
+    holdTime: 0, score: 0, runTime: 0,
+    dead: false, won: false, exploded: false, scram: false,
+    lastLog: 0, _histTimer: 0,
+    rodPositions: new Array(24).fill(50),
+    warnedMarginLow: false,
+    warnedMarginCrit: false,
+    warnedTempHigh: false,
+    warnedVoidHigh: false,
+    warnedXenonHigh: false,
+    warnedPowerOver: false,
+  });
+  history.power = [];
+  history.temp = [];
+  history.pressure = [];
+  logEl.innerHTML = '';
+  document.getElementById('overlay').classList.remove('show');
+  document.body.style.background = '';
+  const ovTitle = document.getElementById('ov-title');
+  ovTitle.style.color = '#ff3333';
+  ovTitle.style.textShadow = '0 0 5px #ff3333';
+  log('Система инициализирована', 'ok');
+  log('Реактор в подкритическом состоянии', 'ok');
+  log('ЗАДАНИЕ: вывести на 1600 МВт, удержать 60 сек', 'ok');
+}
+
+// ============ ГЛАВНЫЙ ЦИКЛ ============
+let lastT = performance.now();
+function loop(t) {
+  const dt = Math.min(0.1, (t - lastT) / 1000);
+  lastT = t;
+  physicsTick(dt);
+  render();
+  requestAnimationFrame(loop);
+}
+
+log('═══════════════════════════════════', 'ok');
+log('  РБМК-1000 ИМИТАТОР v1.6', 'ok');
+log('═══════════════════════════════════', 'ok');
+log('Система управления загружена', 'ok');
+log('Реактор в подкритическом состоянии', 'ok');
+log('ЦЕЛЬ: вывести реактор на 1600 МВт', 'ok');
+log('и удержать мощность 60 секунд', 'ok');
+log('ОСТОРОЖНО: положительный паровой', 'warn');
+log('коэффициент реактивности!', 'warn');
+log('───────────────────────────────────', 'ok');
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
